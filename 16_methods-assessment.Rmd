@@ -1,4 +1,4 @@
-# {{{chapter_title}}}
+# Methods assessment
 
 **Learning objectives:**
 
