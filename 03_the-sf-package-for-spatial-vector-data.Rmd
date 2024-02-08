@@ -2,12 +2,597 @@
 
 **Learning objectives:**
 
-- THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
+- learn what simple features are and get know them in R
+- read, write, decompose and compose an `sf` object
+- get the gist of making a static and an interactive map (see ch. 5)
+- work with `sf` objects: subsetting, spatial operations, logical operations, joining
 
-## SLIDE 1 {-}
+## Simple features (1) {-}
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+- [Simple features](https://en.wikipedia.org/wiki/Simple_Features) ([simple feature access](https://www.ogc.org/standard/sfa/)): formal standard (ISO 19125-1:2004) to describe how **objects in the real world** can be represented in computers, with emphasis on the **spatial geometry**
+- All geometries are composed of points. Points are coordinates in a 2-, 3- or 4-dimensional space.
+
+(Source: [Vignette 1](https://r-spatial.github.io/sf/articles/sf1.html) of **sf** package)
+
+## Simple features (2) {-}
+
+Seven most common types:
+
+| type | description                                       
+| ---- | -------------------------------------------------- 
+| `POINT` | single point
+| `LINESTRING` | sequence of points connected by straight, non-self intersecting line pieces
+| `POLYGON` | sequence of points form a closed, non-self intersecting ring; zero or more subsequent rings denote holes
+| `MULTIPOINT` | set of points
+| `MULTILINESTRING` | set of linestrings
+| `MULTIPOLYGON` | set of polygons
+| `GEOMETRYCOLLECTION` | set of geometries of any type except `GEOMETRYCOLLECTION`
+
+(Based on [vignette 1](https://r-spatial.github.io/sf/articles/sf1.html) of **sf** package)
+
+## Simple features in R (1) {-}
+
+Package **sf**: to read, manipulate and write simple features in R
+
+```{r message=FALSE}
+# install.packages("sf")
+library(sf)
+filepath <- system.file("shape/nc.shp", package = "sf")
+```
+
+Reading a geospatial data file:
+
+```{r}
+# nc <- st_read(filepath, quiet = TRUE, as_tibble = TRUE)
+nc <- read_sf(filepath)
+```
+
+Read the documentation of this dataset with `?nc` and on <https://jakubnowosad.com/spData/reference/nc.sids.html>.
+
+## Simple features in R (2) {-}
+
+```{r}
+nc
+```
+
+## Simple features in R (3) {-}
+
+```{r}
+library(dplyr, warn.conflicts = FALSE)
+glimpse(nc)
+```
+
+## Simple features in R (4) {-}
+
+Extracting the geometry column:
+
+```{r collapse = TRUE}
+nc_geom <- st_geometry(nc)
+nc_geom
+```
+
+```{r}
+all.equal(nc_geom, nc$geometry)
+```
+
+## Simple features in R (5) {-}
+
+```{r}
+class(nc)
+class(nc_geom)
+```
+
+- Class `sf`: data frame:
+  - rows = simple features
+  - columns = attributes and a 'sticky' geometry column
+- Class `sfc`: the geometry column, i.e. a list column.
+It is a **list** of the geometries of the simple features.
+
+```{r}
+nc_geom[[8]] # eighth geometry
+class(nc_geom[[8]])
+```
+
+- Class `sfg`: the geometry of a single feature
+
+## Simple features in R (6) {-}
+
+Dropping the geometry column:
+
+```{r}
+st_drop_geometry(nc)
+```
+
+## Simple features in R (7) {-}
+
+Returning the CRS (coordinate reference system):
+
+```{r}
+nc_crs <- st_crs(nc)
+```
+
+From `?st_crs`:
+
+> the `$` method for `crs` objects retrieves named elements using the GDAL interface; named elements include `"SemiMajor"`, `"SemiMinor"`, `"InvFlattening"`, `"IsGeographic"`, `"units_gdal"`, `"IsVertical"`, `"WktPretty"`, `"Wkt"`, `"Name"`, `"proj4string"`, `"epsg"`, `"yx"`, `"ud_unit"`, and `"axes"` (this may be subject to changes in future GDAL versions).
+
+## Simple features in R (8) {-}
+
+```{r}
+nc_crs$Name
+nc_crs$epsg
+```
+
+## Simple features in R (9) {-}
+
+Formal CRS definition is given by the WKT string (also given by `print(nc_crs)`):
+
+```{r}
+nc_crs$wkt |> cat()
+```
+
+
+## Simple features in R (10) {-}
+
+Return point coordinates contained in a `sf` object:
+
+```{r}
+st_coordinates(nc) |> class()
+st_coordinates(nc) |> head()
+st_coordinates(nc) |> tail()
+```
+
+From `?st_coordinates`:
+
+> [...] for `MULTIPOLYGON` `L1` refers to the main ring or holes, `L2` to the ring id in the `MULTIPOLYGON`, and `L3` to the simple feature.
+
+## Static maps with ggplot2 (1) {-}
+
+```{r out.width='100%'}
+library(ggplot2)
+ggplot(nc) + geom_sf(fill = "mistyrose") + theme_bw()
+```
+
+## Static maps with ggplot2 (2) {-}
+
+```{r warning=FALSE}
+ggplot(nc) + 
+  geom_sf() + 
+  geom_sf_label(aes(label = NAME)) +
+  coord_sf(xlim = c(-81, -79), ylim = c(35, 36)) +
+  theme_bw()
+```
+
+## Interactive maps with mapview (1) {-}
+
+`st_sample()` samples points on spatial features, and returns an `sfc` class
+
+However **[mapview](https://r-spatial.github.io/mapview)** needs an `sf` object.
+To upgrade `sfc` to `sf` we use `st_as_sf()`.
+
+```{r include=FALSE}
+set.seed(20240203)
+```
+
+```{r}
+nc_points <- st_sample(nc, size = 10) |> st_as_sf() 
+```
+
+## Interactive maps with mapview (2) {-}
+
+```{r message=FALSE, warning=FALSE, out.width='100%'}
+library(mapview)
+mapview(nc, col.regions = "navajowhite3", label = "NAME") + 
+  mapview(nc_points, col.regions = "red", cex = 5)
+```
+
+## Another `st_coordinates()` example {-}
+
+```{r}
+st_geometry_type(nc_points)
+```
+
+```{r}
+st_coordinates(nc_points) |> head()
+```
+
+## Writing an sf object to file {-}
+
+Use `st_write()`:
+
+```{r}
+tempfile_geojson <- tempfile(fileext = ".geojson")
+st_write(nc_points, tempfile_geojson)
+```
+
+Read back in with:
+
+```{r eval=FALSE}
+st_read(tempfile_geojson)
+```
+
+## Subsetting simple features (1) {-}
+
+Based on the **sf** documentation:
+
+```
+## S3 method for class 'sf'
+x[i, j, ..., drop = FALSE, op = st_intersects]
+```
+
+- `i`: row selection (as in data frames), or a `sf` object to work with the `op` argument
+- `j`: column selection (as in data frames)
+- `drop`:  default `FALSE`; if `TRUE` drop the geometry column (= return data frame)
+- `op`: geometrical binary predicate function to apply when `i` is a simple feature object
+
+So we can subset using non-spatial criteria (row and column selection) **or** spatial criteria (another `sf` object).
+
+## Subsetting simple features (2) {-}
+
+Non-spatial criteria:
+
+```{r}
+nc[1, ] # first row
+```
+
+## Subsetting simple features (3) {-}
+
+Non-spatial criteria -- continued:
+
+```{r}
+nc[nc$NAME == "Ashe", ] # row with NAME "Ashe"
+```
+
+## Subsetting simple features (4) {-}
+
+Non-spatial criteria -- continued:
+
+```{r}
+nc[1, "NWBIR74"] # first row, column with name NWBIR74
+nc[1, "NWBIR74", drop = TRUE] # drop geometry
+```
+
+## Subsetting simple features (5) {-}
+
+Non-spatial criteria -- continued:
+
+```{r out.width='100%'}
+nc[!(nc$FIPS %in% c("37125", "37051")), ] |> 
+  ggplot() + 
+  geom_sf(aes(fill = SID79)) +
+  theme_bw()
+```
+
+## Subsetting simple features (6) {-}
+
+Spatial criteria:
+
+```{r}
+nc_subset <- nc[nc_points, ]
+nc_subset
+```
+
+## Subsetting simple features (7) {-}
+
+```{r out.width='100%'}
+ggplot() + 
+  geom_sf(data = nc_subset) + 
+  geom_sf(data = nc_points) + 
+  theme_bw()
+```
+
+## Generate sf objects (1) {-}
+
+First let's start at a higher level: we already have a data object.
+
+Conversion can then be done with `st_as_sf()`.
+
+Suppose we have a data frame with point coordinates, and we know that the CRS is `EPSG:4326`.
+
+```{r}
+d <- tibble(
+  place = c("London", "Paris", "Madrid", "Rome"),
+  long = c(-0.118092, 2.349014, -3.703339, 12.496366),
+  lat = c(51.509865, 48.864716, 40.416729, 41.902782),
+  value = c(200, 300, 400, 500))
+d
+```
+
+## Generate sf objects (2) {-}
+
+```{r}
+dsf <- st_as_sf(d, coords = c("long", "lat"), crs = 4326)
+dsf
+```
+
+## Generate sf objects (3) {-}
+
+We can also start from scratch:
+
+- create the geometries from coordinate vectors or matrices with `st_point()`, `st_linestring()`, `st_polygon()`, `st_multipolygon()` etc.
+- combine the geometries into an `sfc` object with `st_sfc()`, which also handles the CRS
+- create an attribute dataframe
+- combine data frame and the geometry column with `st_sf()`
+
+## Generate sf objects (4) {-}
+
+```{r}
+# Single point (point as a vector)
+p1_sfg <- st_point(c(2, 2))
+p2_sfg <- st_point(c(2.5, 3))
+```
+
+```{r}
+p1_sfg
+p2_sfg
+```
+
+## Generate sf objects (5) {-}
+
+```{r}
+# Set of points (points as a matrix)
+p <- rbind(c(6, 2), c(6.1, 2.6), c(6.8, 2.5),
+           c(6.2, 1.5), c(6.8, 1.8))
+p
+mp_sfg <- st_multipoint(p)
+mp_sfg
+```
+
+## Generate sf objects (6) {-}
+
+A polygon according to the **sf** vignette:
+
+- a geometry with a positive area (two-dimensional)
+- sequence of points form a closed, non-self intersecting ring
+  - the first ring denotes the exterior ring
+  - zero or more subsequent rings denote holes in this exterior ring
+
+## Generate sf objects (7) {-}
+
+```{r}
+# exterior ring
+p1 <- rbind(c(10, 0), c(11, 0), c(13, 2),
+            c(12, 4), c(11, 4), c(10, 0))
+p1
+# hole
+p2 <- rbind(c(11, 1), c(11, 2), c(12, 2), c(11, 1))
+p2
+# polygon including hole
+pol_sfg <- st_polygon(list(p1, p2))
+pol_sfg
+```
+
+## Generate sf objects (8) {-}
+
+```{r collapse=TRUE}
+p_sfc <- st_sfc(p1_sfg, p2_sfg, mp_sfg, pol_sfg)
+p_sfc
+```
+
+## Generate sf objects (9) {-}
+
+```{r}
+df <- tibble(v1 = c("A", "B", "C", "D"))
+df
+p_sf <- st_sf(df, geometry = p_sfc)
+p_sf
+```
+
+## Generate sf objects (10) {-}
+
+```{r out.width='100%'}
+ggplot(p_sf) + 
+  geom_sf(aes(fill = v1), size = 3, shape = 21) + 
+  theme_bw()
+```
+
+
+## Manipulating sf objects (1) {-}
+
+CRS related:
+
+- `st_crs()<-` sets a CRS
+- `st_transform()` transforms data to another CRS (see previous chapter)
+
+Spatial operations, e.g.:
+
+- `st_union()` combines several sf objects into one
+- `st_simplify()` simplifies a sf object
+
+## Manipulating sf objects (2) {-}
+
+```{r collapse=TRUE}
+nc_union <- st_union(nc)
+nc_union
+```
+
+
+```{r}
+class(nc_union)
+```
+
+## Manipulating sf objects (3) {-}
+
+`ggplot()` also supports `sfc`:
+
+```{r out.width='100%'}
+ggplot(nc_union) + geom_sf() + theme_bw()
+```
+
+## Manipulating sf objects (5) {-}
+
+```{r out.width='100%'}
+ggplot(st_simplify(nc, dTolerance = 5e3)) + geom_sf() + theme_bw()
+```
+
+## Manipulating sf objects (4) {-}
+
+```{r out.width='100%'}
+ggplot(st_simplify(nc, dTolerance = 10e3)) + geom_sf() + theme_bw()
+```
+
+## Manipulating sf objects (6) {-}
+
+```{r out.width='100%'}
+ggplot(st_simplify(nc, dTolerance = 15e3)) + geom_sf() + theme_bw()
+```
+
+## Manipulating sf objects (7) {-}
+
+Some more spatial operations are shown in <https://r.geocompx.org/geometry-operations#fig:venn-clip>.
+
+## Binary logical operations (1) {-}
+
+Partly [based on vignette 3](https://r-spatial.github.io/sf/articles/sf3.html#binary-logical-operations) from **sf**.
+
+First create some objects to play with.
+
+- `x`: 3 touching polygons
+- `y`: 4 overlapping polygons
+
+```{r}
+b0 <- st_polygon(list(rbind(c(-1, -1), c(1, -1), c(1, 1), c(-1, 1), c(-1, -1))))
+b1 <- b0 + 2
+b2 <- b0 + c(-0.2, 2)
+x <- st_sfc(b0, b1, b2)
+a0 <- b0 * 0.8
+a1 <- a0 * 0.5 + c(2, 0.7)
+a2 <- a0 + 1
+a3 <- b0 * 0.5 + c(2, -0.5)
+y <- st_sfc(a0, a1, a2, a3)
+plot(x, border = 'red')
+plot(y, border = 'green', add = TRUE)
+```
+
+## Binary logical operations (2) {-}
+
+Binary logical operations (binary predicate functions) describe the topological relationship between **a pair of simple features**.
+
+Applied to two `sf` objects, they return:
+
+- either a _sparse_ matrix (`sgbp` class: sparse geometry binary predicate),
+- or a _dense_ matrix.
+
+```{r}
+sparse <- st_intersects(x, y)
+sparse
+class(sparse)
+str(sparse, give.attr = FALSE)
+```
+
+## Binary logical operations (3) {-}
+
+```{r}
+dense <- st_intersects(x, y, sparse = FALSE)
+dense
+class(dense)
+str(dense)
+```
+
+## Binary logical operations (4) {-}
+
+An overview of binary logical operations is illustrated in <https://r.geocompx.org/spatial-operations#fig:relations>.
+
+## Binary logical operations (5) {-}
+
+With binary predicate functions like `st_intersects()`, one can collect information about the topological relationship _without making a spatially joined `sf` object_ (with `sf::st_join()`).
+
+**Example 1**: counting points in polygons and adding the result to a copy of `nc`.
+
+```{r include=FALSE}
+set.seed(20230203)
+```
+
+```{r}
+nc_points_2 <- st_sample(nc, size = 100)
+```
+
+## Binary logical operations (6) {-}
+
+```{r out.width='100%'}
+ggplot() + geom_sf(data = nc) + geom_sf(data = nc_points_2) + theme_bw()
+```
+
+## Binary logical operations (7) {-}
+
+The order of the two arguments of `st_intersects()` is important!
+
+```{r}
+inter <- st_intersects(nc, nc_points_2)
+inter
+lengths(inter)
+```
+
+## Binary logical operations (8) {-}
+
+Add point count to each polygon:
+
+```{r}
+nc2 <- nc
+nc2$count <- lengths(inter)
+glimpse(nc2)
+```
+
+## Binary logical operations (9) {-}
+
+```{r out.width='100%'}
+ggplot(nc2) + geom_sf(aes(fill = count)) + theme_bw()
+```
+
+## Binary logical operations (10) {-}
+
+**Example 2**: identifying the `nc` polygons that contain points from `nc_points`.
+
+Notice the order of the arguments in `st_intersects()`!
+
+```{r}
+inter <- st_intersects(nc_points, nc)
+inter
+unlist(inter)
+```
+
+## Binary logical operations (11) {-}
+
+```{r}
+counties_with_point <- nc[unlist(inter), ]
+counties_with_point$NAME
+```
+
+```{r}
+cbind(nc_points, areaname = counties_with_point$NAME)
+```
+
+
+## Joining `sf` object with data (1) {-}
+
+This can be done with the `*_join()` functions from **dplyr**.
+
+Example [based on vignette 4](https://r-spatial.github.io/sf/articles/sf4.html#joining-two-feature-sets-based-on-attributes) from **sf**.
+
+```{r}
+x <- st_sf(a = 1:2, geom = st_sfc(st_point(c(0, 0)), st_point(c(1, 1))))
+y <- data.frame(a = 2:3, letter = letters[11:12])
+x
+y
+```
+
+## Joining `sf` object with data (2) {-}
+
+```{r}
+inner_join(x, y, by = "a")
+```
+
+## Joining `sf` object with data (3) {-}
+
+```{r}
+left_join(x, y, by = "a")
+```
+
+## Joining `sf` object with data (4) {-}
+
+```{r}
+semi_join(x, y, by = "a")
+```
+
 
 ## Meeting Videos {-}
 
