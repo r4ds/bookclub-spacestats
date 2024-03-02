@@ -1,13 +1,161 @@
 # R packages to download open spatial data
 
 **Learning objectives:**
+- find the right package for downloading spatial data
 
-- THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
+## Packages
 
-## SLIDE 1 {-}
+- rnaturalearth (boundaries)
+- geodata (climate, elevation, land use, soil, crop, species occurrence, administrative boundaries, and other data)
+- chirps (daily high-resolution precipitation, as well as daily maximum and minimum temperatures)
+- elevatr (elevation data from Amazon Web Services)
+- osmdata (roads, shops, railway stations, and much more)
+- wbstats (global socio-economic data spanning several decades)
+- spocc (species occurrence data sources including Global Biodiversity Information)
+- wopr (estimates of population sizes for specific geographic areas)
+- rdhs (Demographic and Health Survey (DHS))
+- malariaAttlas (global malaria data)
+- openair (air quality data and other atmospheric composition data)
+- spatstat (point pattern data)
+- spData (includes diverse spatial datasets )
+- ggmap (geocode place names or addresses)
+- opencage (convert names to geographic coordinates)
+- tidycensus
+- tigris
+- mapSpain
+- goebr
+- giscoR
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+### Example with rnaturalearth
+```{r eval=FALSE}
+# install.packages("devtools")
+# devtools::install_github("ropensci/rnaturalearthhires")
+
+library(rnaturalearth)
+library(sf)
+library(ggplot2)
+library(viridis)
+library(patchwork)
+
+map1 <- ne_countries(type = "countries", 
+                     country = "Germany",
+                     scale = "medium", 
+                     returnclass = "sf")
+map2 <- rnaturalearth::ne_states("Germany", 
+                                 returnclass = "sf")
+p1 <- ggplot(map1) + geom_sf()
+p2 <- ggplot(map2) + geom_sf()
+p1 + p2
+```
+
+## geodata
+```{r eval=FALSE}
+library(geodata)
+d <- worldclim_country(country = "Jamaica", 
+                       var = "tmin",
+                       path = tempdir())
+terra::plot(mean(d), 
+            plg = list(title = "Min. temperature (C)"))
+```
+
+
+## chirps
+```{r eval=FALSE}
+library("chirps")
+location <- data.frame(long = 100.523186, lat = 13.736717)
+d <- get_chirps(location, dates = c("2020-01-01", "2022-12-31"),
+                server = "ClimateSERV")
+ggplot(d, aes(x = date, y = chirps)) + geom_line() +
+  labs(y = "Precipitation (mm)")
+```
+
+## elevatr
+```{r eval=FALSE}
+library(rnaturalearth)
+library(elevatr)
+library(terra)
+map <- ne_countries(type = "countries", country = "Switzerland",
+                    scale = "medium", returnclass = "sf")
+d <- get_elev_raster(locations = map, z = 9, clip = "locations")
+terra::plot(rast(d), plg = list(title = "Elevation (m)"))
+```
+
+
+## osmdata
+
+```{r eval=FALSE}
+library(osmdata)
+head(available_features())
+head(available_tags("amenity"))
+placebb <- getbb("Barcelona")
+placebb
+```
+
+
+```{r eval=FALSE}
+hospitals <- placebb %>% opq() %>%
+  add_osm_feature(key = "amenity", value = "hospital") %>%
+  osmdata_sf()
+```
+
+```{r eval=FALSE}
+motorways <- placebb %>% opq() %>%
+  add_osm_feature(key = "highway", value = "motorway") %>%
+  osmdata_sf()
+```
+
+### with leaflet
+```{r eval=FALSE}
+library(leaflet)
+leaflet() %>%  addTiles() %>%
+  addPolylines(data = motorways$osm_lines, color = "black") %>%
+  addPolygons(data = hospitals$osm_polygons,
+              label = hospitals$osm_polygons$name)
+```
+
+## wbstats
+```{r eval=FALSE}
+library(wbstats)
+indicators <- wb_search(pattern = "poverty|unemployment")
+# print(indicators)
+```
+
+```{r eval=FALSE}
+d <- wb_data(indicator = "MO.INDEX.HDEV.XQ",
+             start_date = 2011, end_date = 2011)
+print(head(d))
+```
+
+
+### with mapview
+```{r eval=FALSE}
+library(rnaturalearth)
+library(mapview)
+map <- ne_countries(continent = "Africa", returnclass = "sf")
+map <- dplyr::left_join(map, d, by = c("iso_a3" = "iso3c"))
+mapview(map, zcol = "MO.INDEX.HDEV.XQ")
+```
+
+
+## spocc
+```{r eval=FALSE}
+library('spocc')
+df <- occ(query = "Bradypus variegatus", from = "gbif",
+          date = c("2000-01-01", "2019-12-31"),
+          gbifopts = list(country = "CR"),
+          has_coords = TRUE, limit = 1000)
+d <- occ2df(df)
+```
+
+
+```{r eval=FALSE}
+library(sf)
+d <- st_as_sf(d, coords = c("longitude", "latitude"))
+st_crs(d) <- 4326
+mapview(d)
+```
+
+
 
 ## Meeting Videos {-}
 
