@@ -1,6 +1,7 @@
 # R packages to download open spatial data
 
 **Learning objectives:**
+
 - find the right package for downloading spatial data
 
 ## Packages
