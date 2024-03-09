@@ -14,5 +14,7 @@ Imports:
     ggplot2,
     mapview,
     rmarkdown,
-    sf
+    sf,
+    spData,
+    spdep
 Encoding: UTF-8
