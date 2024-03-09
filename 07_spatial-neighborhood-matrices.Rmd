@@ -1,13 +1,364 @@
-# Spatial neighborhood matrices
+# Spatial neighbourhood matrices
 
 **Learning objectives:**
 
-- THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
+- understand what spatial neighbours are
+- know how spatial neighbours can be defined
+- create and plot a neighbours list
+- use a neighbours list to create a spatial neighbourhood matrix
 
-## SLIDE 1 {-}
+## Areal data {-}
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+- This is the first chapter of the part 'areal data'.
+
+- > In areal or lattice data, the domain D  is a fixed countable collection of (regular or irregular) areal units at which variables are observed.
+
+- Areal data usually arise when a number of events corresponding to some variable of interest are aggregated in areas.
+
+## Spatial neighbourhood {-}
+
+- It represents which areas are close to one another (polygons, points)
+
+  - In this chapter, we won't use attribute variables, only the geometries
+
+## Spatial neighbourhood {-}
+
+- It will help to assess spatial autocorrelation with areal data
+  - to do that, areas must be spatially connected by weights: in a **spatial neighbourhood matrix**
+  - to obtain a neighbourhood matrix, one needs to define the neighbours of each area: the **neighbours list**
+
+## Spatial neighbourhood in R {-}
+
+- Package **spdep**: <https://r-spatial.github.io/spdep>
+
+```{r message=FALSE}
+library(sf)
+library(spdep)
+library(ggplot2)
+```
+
+## Read example data {-}
+
+```{r}
+map <- read_sf(system.file("shapes/columbus.shp",
+                           package = "spData"), quiet = TRUE)
+map
+```
+
+## Example data {-}
+
+From `?spData::columbus`:
+
+> The columbus data frame has 49 rows and 22 columns
+
+> Unit of analysis: 49 neighbourhoods in Columbus, OH, 1980 data
+
+## Example data {-}
+
+```{r}
+# we won't need attributes:
+map_geom <- st_geometry(map)
+ggplot(map_geom) + geom_sf() + theme_bw()
+```
+
+## Spatial neighbourhood {-}
+
+Remind:
+
+- **spatial neighbourhood matrix**: connects areas by weights
+- to obtain it, one needs the **neighbours list**: defines the neighbours of each area
+
+## Spatial neighbours  {-}
+
+The concept of a neighbour is **binary** (0 / 1)!
+
+Area 2 **is** a spatial neighbour of area 1, or it is **not**.
+
+## Spatial neighbours list  {-}
+
+- A **neighbours list** (**`nb`** class) is a kind of sparse matrix: a list that gives the indices of neighbours for each area in turn.
+  - e.g. the first 6 elements give the neighbour indices of the first 6 geometries of the input layer:
+  
+```r
+[[1]]
+[1] 2 3
+[[2]]
+[1] 1 3 4
+[[3]]
+[1] 1 2 4 5
+[[4]]
+[1] 2 3 5 8
+[[5]]
+[1]  3  4  6  8  9 11 15 16
+[[6]]
+[1] 5 9
+```
+
+## Defining who is a neighbour and who isn't {-}
+
+- **contiguity criteria** -- this needs _polygons_:
+  - the areas that share at least a common vertex (type **Queen**)
+  - the areas that share a common border (type **Rook**)
+
+- **distance criteria** -- this needs _points_ (e.g. polygon centroids):
+  - the areas that are **within some distance** apart (lower and upper bounds)
+  - the areas that are **among the $k$ nearest** to an area (asymmetric relationship)
+
+## Creating a neighbours list ('nb') from geometries {-}
+
+- contiguity based:
+  - `poly2nb(<polygons>, queen = TRUE)` (default)
+  - `poly2nb(<polygons>, queen = FALSE)`
+  
+- distance based:
+  - `dnearneigh(<points>, d1, d2)`
+  - `knn2nb(<matrix of nearest neighbours>)`
+
+## Neighbours list: type Queen contiguity {-}
+
+```{r}
+nb1 <- poly2nb(map_geom, queen = TRUE)
+nb1
+head(nb1)
+```
+
+## Neighbours list: type Rook contiguity {-}
+
+```{r}
+nb2 <- poly2nb(map_geom, queen = FALSE)
+nb2
+head(nb2)
+```
+
+## Plotting {-}
+
+With `nb.plot(<neighbours list>, <sfc object>)`
+
+```{r out.width='100%'}
+plot(map_geom, border = "lightgray")
+plot.nb(nb1, map_geom, add = TRUE)
+```
+
+## Plotting {-}
+
+```{r out.width='100%'}
+plot(map_geom, border = "lightgray")
+plot.nb(nb2, map_geom, add = TRUE)
+```
+
+## Neighbours list based on distance bounds {-}
+
+Creating centroids from sf polygons:
+
+```{r collapse=TRUE}
+(centroids <- st_centroid(map_geom))
+```
+
+## Neighbours list based on distance bounds {-}
+
+```{r out.width='100%'}
+ggplot() + 
+  geom_sf(data = map_geom) +
+  geom_sf(data = centroids) +
+  theme_bw()
+```
+
+## Neighbours list based on distance bounds {-}
+
+```{r}
+nb3 <- dnearneigh(x = centroids, d1 = 0, d2 = 0.4)
+head(nb3)
+```
+
+## Neighbours list based on distance bounds {-}
+
+```{r out.width='100%'}
+plot(map_geom, border = "lightgray")
+plot.nb(nb3, map_geom, add = TRUE)
+```
+
+## Neighbours list based on $k$ nearest neighbours {-}
+
+In two steps:
+
+1. `knearneigh()`: create a `knn` object ('k-nearest neighbour classification')
+    - it contains `nn`: a _matrix_ that defines the k nearest neighbors
+1. `knn2nb()`: convert the `knn` object to a neighbours list
+
+```{r}
+knn_centroids <- knearneigh(centroids, k = 3)
+class(knn_centroids)
+class(knn_centroids$nn)
+head(knn_centroids$nn)
+```
+
+## Neighbours list based on $k$ nearest neighbours {-}
+
+Step 2:
+
+```{r}
+nb4 <- knn2nb(knn_centroids)
+head(nb4)
+```
+
+## Neighbours list based on $k$ nearest neighbours {-}
+
+```{r out.width='100%'}
+plot(map_geom, border = "lightgray")
+plot.nb(nb4, map_geom, add = TRUE)
+```
+
+## Creating higher order neighbours lists {-}
+
+Starting from an existing neighbours list, one can redefine neighbours using a lag:
+
+- lag = 2: neighbours are 2 links apart in the original neighbours list
+- lag = 3: neighbours are 3 links apart in the original neighbours list
+- ...
+
+## Creating higher order neighbours lists {-}
+
+`nblag(<neighbours list>, maxlag =)`: to produce `maxlag` higher order neighbours lists
+
+  - returns a list of lagged neighbours lists: element 1 for lag = 1, etc)
+
+## Creating higher order neighbours lists {-}
+
+```{r}
+nblags <- nblag(neighbours = nb1, maxlag = 3)
+class(nblags)
+length(nblags)
+all.equal(nb1, nblags[[1]], check.attributes = FALSE)
+```
+
+## Creating higher order neighbours lists {-}
+
+```{r}
+lapply(nblags, head, 2)
+```
+
+## Creating higher order neighbours lists {-}
+
+Plotting the second order neighbours list:
+
+```{r out.width='100%'}
+plot(map_geom, border = "lightgray")
+plot.nb(nblags[[2]], map_geom, add = TRUE)
+```
+
+## Creating higher order neighbours lists {-}
+
+Plotting the third order neighbours list:
+
+```{r out.width='100%'}
+plot(map_geom, border = "lightgray")
+plot.nb(nblags[[3]], map_geom, add = TRUE)
+```
+
+## Cumulating neighbours lists {-}
+
+You can cumulate multiple neighbour lists to a single neighbour list:\
+`nblag_cumul(<list of neighbours lists>)`
+
+Cumulating the 1st and 2nd order neighbours lists from before:
+
+```{r}
+nblagsc <- nblag_cumul(nblags[1:2])
+class(nblagsc)
+head(nblagsc)
+```
+
+## Cumulating neighbours lists {-}
+
+```{r out.width='100%'}
+plot(map_geom, border = "lightgray")
+plot.nb(nblagsc, map_geom, add = TRUE)
+```
+
+## Further things to do with a neighbours list {-}
+
+- Count neighbours: `lengths(<nb>)` (or `spdep::card()`)
+- Compute distances between neighbours: `nbdists(<nb>, <points>)`
+- Create a spatial neighbourhoods matrix: `nb2mat(<nb>, ...)`
+
+## Count neighbours {-}
+
+```{r}
+lengths(nb1)
+```
+
+## Compute distances between neighbours {-}
+
+```{r}
+nbdists(nb1) |> try()
+```
+
+## Compute distances between neighbours {-}
+
+```{r}
+nbdists(nb1, centroids) |> head()
+```
+
+## Neighbourhood matrix {-}
+
+Straightforward function is the `nb2mat()` function (not in the book).
+
+It converts the 'sparse' neighbours list to a square neighbourhood matrix of **weights**.
+
+## Neighbourhood matrix {-}
+
+Basic conversion from the neighbours list to a neighbourhood matrix:
+
+```{r}
+nb2mat(nb1, style = "B") |> dim()
+```
+
+## Neighbourhood matrix {-}
+
+The basic (B) format uses its input as-is: binary!
+
+```{r}
+nb2mat(nb1, style = "B")[1:4, 1:7]
+```
+
+## Neighbourhood matrix {-}
+
+But one can standardise, e.g. by row (W):
+
+```{r}
+nb2mat(nb1, style = "W")[1:4, 1:7] |> round(2)
+```
+
+## Neighbourhood matrix {-}
+
+You can use `glist` argument of `nb2mat()` to replace the 0 / 1 value from the neighbours list by preset weights.
+
+For example, calculate inverse distance weights and feed them to `nb2mat()`.
+
+```{r}
+dists <- nbdists(nb1, centroids)
+head(dists)
+```
+
+## Neighbourhood matrix {-}
+
+```{r}
+ids <- lapply(dists, function(x) {1 / x})
+head(ids)
+```
+
+## Neighbourhood matrix {-}
+
+```{r}
+nb2mat(nb1, glist = ids, style = "B")[1:4, 1:7]
+```
+
+## Neighbourhood matrix {-}
+
+```{r}
+nb2mat(nb1, glist = ids, style = "W")[1:4, 1:7]
+```
+
 
 ## Meeting Videos {-}
 
