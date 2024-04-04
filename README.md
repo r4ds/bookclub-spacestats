@@ -1,15 +1,15 @@
-# R4DS Spatial Statistics for Data Science: Theory and Practice with R Book Club
+# DSLC Spatial Statistics for Data Science: Theory and Practice with R Book Club
 
-Welcome to the R4DS Spatial Statistics for Data Science: Theory and Practice with R Book Club!
+Welcome to the DSLC Spatial Statistics for Data Science: Theory and Practice with R Book Club!
 
 We are working together to read [_Spatial Statistics for Data Science: Theory and Practice with R_](https://www.paulamoraga.com/book-spatial/index.html) by Paula Moraga (copyright 2023).
-If you would like a print version, please consider purchasing it using our [Amazon Affiliates link](https://www.routledge.com/Spatial-Statistics-for-Data-Science-Theory-and-Practice-with-R/Moraga/p/book/9781032633510). All profits from purchases through that link go toward maintaining the R4DS Online Learning Community.
-Join the [#book_club-spacestats](https://rfordatascience.slack.com/archives/C066RJ24SHF) channel on the [R4DS Slack](https://r4ds.io/join) to participate.
-As we read, we are producing [notes about the book](https://r4ds.io/spacestats).
+If you would like a print version, please consider purchasing it using our [Amazon Affiliates link](https://www.routledge.com/Spatial-Statistics-for-Data-Science-Theory-and-Practice-with-R/Moraga/p/book/9781032633510). All profits from purchases through that link go toward maintaining the Data Science Learning Community.
+Join the [#book_club-spacestats](https://dslcio.slack.com/archives/C066RJ24SHF) channel on the [DSLC Slack](https://dslc.io/join) to participate.
+As we read, we are producing [notes about the book](https://dslc.io/spacestats).
 
 ## Meeting Schedule
 
-If you would like to present, please see the sign-up sheet for your cohort (linked below, and pinned in the [#book_club-spacestats](https://rfordatascience.slack.com/archives/C066RJ24SHF) channel on Slack)!
+If you would like to present, please see the sign-up sheet for your cohort (linked below, and pinned in the [#book_club-spacestats](https://dslcio.slack.com/archives/C066RJ24SHF) channel on Slack)!
 
 - [Cohort 1](https://docs.google.com/spreadsheets/d/1cD_aXJJ73O1cL3EI79-e_Y9eWNNqvftv8das1hcBGRA/edit?usp=sharing) (started 2024-01-20, facilitated by Mikhael Manurung): [Saturdays, 10:00 AM CST/CDT](https://www.timeanddate.com/worldclock/converter.html?iso=20240120T160000&p1=24&p2=1440) | [meeting videos](https://www.youtube.com/playlist?list=PL3x6DOfs2NGhACUSnWhcsTLMbDikFQ8fL)
 
@@ -40,7 +40,7 @@ Do these steps each time you present another chapter:
 10. When your PR has been accepted ("merged"), `usethis::pr_finish()` to close out your branch and prepare your local repository for future work.
 11. Now that your local copy is up-to-date with the main repo, you need to update your remote fork. Run `gert::git_push("origin")` or click the `Push` button on the `Git` tab of Rstudio.
 
-When your PR is checked into the main branch, the bookdown site will rebuild, adding your slides to [this site](https://r4ds.io/spacestats).
+When your PR is checked into the main branch, the bookdown site will rebuild, adding your slides to [this site](https://dslc.io/spacestats).
 
 
 ## Code of Conduct
