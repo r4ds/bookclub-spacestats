@@ -2,12 +2,199 @@
 
 **Learning objectives:**
 
-- THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
+- Understand the specification of INLA models.
+- Be able to fit a bayesian model for areal data with spatial dependencies.
 
-## SLIDE 1 {-}
+## Bayesian spatial models in INLA {-}
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+R-INLA can fit a broad class of generalized linear mixed models (GLMMs), including spatial and spatio-temporal models: those that can be expressed as latent Gaussian Markov random fields (GMRF).
+
+In bayesian modelling, a posterior distribution is estimated for every model parameter.
+
+INLA algorithm (Integrated Nested Laplace Approximation): fast approximation method to obtain the posterior distributions; very fast compared to MCMC approximation.
+
+R-INLA provides several criteria to compare and evaluate models (DIC, WAIC, CPO).
+
+## Bayesian spatial models in INLA {-}
+
+```{r message=FALSE}
+library(INLA)
+library(sf)
+library(spData)
+library(ggplot2)
+library(spdep)
+```
+
+## Bayesian spatial models in INLA {-}
+
+The model for an observed response $Y_i$ needs:
+
+- the likelihood distribution (exponential family, e.g. normal, poisson, binomial)
+- the link function $g$
+- a linear predictor $\eta_i$
+
+## Bayesian spatial models in INLA {-}
+
+Likelihood distribution for each observed response.
+
+$$Y_i|\eta_i,\theta_1 \sim \pi(Y_i|\eta_i,\theta_1)$$
+Example distributions:
+
+$$Y_i \sim \mathcal{N}(\mu_i, \sigma^2_i)$$
+
+$$Y_i \sim \mathcal{Poisson}(\mu_i)$$
+
+$$Y_i \sim \mathcal{Bin}(n, \pi_i)$$
+
+## Bayesian spatial models in INLA {-}
+
+Available likelihood families:
+
+```{r}
+inla.list.models("likelihood")
+```
+
+
+## Bayesian spatial models in INLA {-}
+
+The linear predictor (latent Gaussian random field) is the model of a parameter of the likelihood distribution, transformed with the link function.
+
+E.g. using log link for parameter $\mu_i$:
+
+$$\eta_i = ln(\mu_i) = X_i \cdot \beta + Z_i$$
+
+E.g. using logit link for parameter $\pi_i$:
+
+$$\eta_i = ln(\frac{\pi_i}{1 - \pi_i}) = X_i \cdot \beta + Z_i$$
+
+## Bayesian spatial models in INLA {-}
+
+Typically, the linear predictor contains both:
+
+- (independent) linear covariate effects: $X_i \cdot \beta$ \
+These will typically correspond to the fixed effects of frequentist GLMMs.
+- other covariate effects: $Z_i$ \
+E.g. non-linear effects, spatial, time & seasonal patterns, random intercepts & slope.
+
+
+## Bayesian spatial models in INLA {-}
+
+Available link functions for each likelihood family, e.g. gamma distribution:
+
+```{r}
+inla.models()$likelihood[["gamma"]]$link
+```
+
+## Bayesian spatial models in INLA {-}
+
+Available 'latent' models to use in terms of the linear predictor:
+
+```{r}
+inla.list.models("latent")
+```
+
+## Bayesian spatial models in INLA {-}
+
+Model specification in R-INLA:
+
+```{r eval=FALSE}
+inla(
+  formula = NULL,
+  family = "gaussian",
+  data = NULL,
+  control.compute = list(),
+  control.predictor = list()
+)
+```
+
+Formula of the linear predictor uses `f()` to specify latent models.
+
+## Bayesian spatial models in INLA {-}
+
+Package website: <https://www.r-inla.org>
+
+Books: <https://www.r-inla.org/learnmore/books>
+
+## Latent models referred in this chapter {-}
+
+BYM = Besag-York-Mollié (BYM) model = the sum of:
+
+- spatial random effect $u_i$ modelled with CAR (conditional autoregressive model; Besag model)
+
+$$u_i|u_{-i} \sim \mathcal{N}(\overline{u_{\delta_i}}, \frac{\sigma^2_u}{n_{\delta_i}})$$
+
+- iid (unstructured) random effects $v_i \sim \mathcal{N}(0, \sigma^2_v)$
+
+## Latent models referred in this chapter {-}
+
+BYM2 = different parametrisation of BYM
+
+$$b_i = \frac{1}{\sqrt{\tau}} \cdot (\sqrt{1-\phi} \cdot v_i + \sqrt{\phi} \cdot u_i)$$
+
+```{r eval=FALSE}
+inla.doc("^besag$", section = "latent")
+inla.doc("^bym$", section = "latent")
+inla.doc("^bym2$", section = "latent")
+```
+
+## Case: housing prices in Boston {-}
+
+```{r out.width='100%'}
+map <- st_read(system.file("shapes/boston_tracts.shp",
+                           package = "spData"), quiet = TRUE)
+map$vble <- log(map$MEDV)
+dim(map)
+```
+
+
+## Case: housing prices in Boston {-}
+
+```{r out.width='100%'}
+ggplot() + geom_sf(data = map, aes(fill = vble))
+```
+
+## Case: housing prices in Boston {-}
+
+We will model the logarithm of the median prices using as covariates the per capita crime (`CRIM`) and the average number of rooms per dwelling (`RM`)
+
+For spatial areas, we need an index vector to identify each area for the BYM2 latent model.
+
+```{r eval = FALSE}
+map$re_u <- 1:nrow(map)
+map$re_v <- 1:nrow(map)
+```
+
+BYM2 also needs a spatial neighbourhood list formatted for INLA
+
+```{r eval = FALSE}
+nb <- poly2nb(map)
+adjmat_path <- file.path(tempdir(), "map.adj")
+nb2INLA(adjmat_path, nb)
+g <- inla.read.graph(filename = adjmat_path)
+```
+
+```{r eval = FALSE}
+formula <- vble ~ CRIM + RM + f(re_u, model = "bym2", graph = g)
+```
+
+## Case: housing prices in Boston {-}
+
+Fitting the INLA model:
+
+```{r eval=FALSE}
+res <- inla(formula, family = "gaussian", data = map,
+            control.predictor = list(compute = TRUE),
+            control.compute = list(return.marginals.predictor = TRUE))
+```
+
+Control computation of fitted values (at the scale of the linear predictor):
+
+- `control.predictor = list(compute = TRUE)`: fitted values and their posterior summary: `res$summary.fitted.values`
+- `control.compute = list(return.marginals.predictor = TRUE)`: 
+    compute posterior marginal distribution of the fitted values:        `res$marginals.fitted.values[[1]]`
+
+Model object evaluation: see book.
+
 
 ## Meeting Videos {-}
 
