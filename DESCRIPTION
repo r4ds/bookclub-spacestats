@@ -11,12 +11,14 @@ Depends:
 Imports: 
     bookdown,
     dplyr,
+    geoR,
     ggplot2,
     INLA,
     mapview,
     rmarkdown,
     sf,
     spData,
-    spdep
+    spdep,
+    tibble
 Additional_repositories: https://inla.r-inla-download.org/R/stable
 Encoding: UTF-8
