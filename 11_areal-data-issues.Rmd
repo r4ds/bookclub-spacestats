@@ -2,12 +2,21 @@
 
 **Learning objectives:**
 
-- THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
+- Type of Areal data issues
 
-## SLIDE 1 {-}
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+## Areal data issues
+
+Areal data issues are common in spatial epidemiology. The most common are:
+
+
+1. **Misaligned Data Problem (MIDP)**: which refers to a situation where the spatial data being analyzed are at a different scale than the one at which they were originally collected. This can lead to biased results because the data are not aligned with the scale of the analysis.
+
+2. **Modifiable Areal Unit Problem (MAUP)**: The MAUP is a statistical bias that occurs when data are aggregated into different areal units. The MAUP can lead to different results depending on the scale of the analysis. For example, if you aggregate data at the county level, you may get different results than if you aggregate data at the state level.
+
+3. **Special case of the MAUP**: **ecological fallacy**, which occurs when you make inferences about individuals based on group-level data. For example, if you find a correlation between income and disease at the county level, you may incorrectly assume that the same correlation exists at the individual level.
+
+
 
 ## Meeting Videos {-}
 
