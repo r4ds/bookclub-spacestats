@@ -12,9 +12,11 @@ Imports:
     bookdown,
     dplyr,
     ggplot2,
+    INLA,
     mapview,
     rmarkdown,
     sf,
     spData,
     spdep
+Additional_repositories: https://inla.r-inla-download.org/R/stable
 Encoding: UTF-8
