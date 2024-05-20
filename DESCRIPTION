@@ -20,5 +20,6 @@ Imports:
     spData,
     spdep,
     tibble
+    tidyverse
 Additional_repositories: https://inla.r-inla-download.org/R/stable
 Encoding: UTF-8
