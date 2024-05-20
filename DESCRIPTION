@@ -17,6 +17,7 @@ Imports:
     mapview,
     rmarkdown,
     sf,
+    SpatialEpi,
     spData,
     spdep,
     tibble,
