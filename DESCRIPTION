@@ -13,14 +13,18 @@ Imports:
     dplyr,
     geoR,
     ggplot2,
+    gstat,
     INLA,
     mapview,
+    nngeo,
     rmarkdown,
     sf,
     SpatialEpi,
     spData,
     spdep,
+    terra,
     tibble,
+    tidyterra,
     tidyverse
 Additional_repositories: https://inla.r-inla-download.org/R/stable
 Encoding: UTF-8
