@@ -2,12 +2,386 @@
 
 **Learning objectives:**
 
-- THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
+- understand and apply three simple interpolation methods
+- integrate several methods as an ensemble prediction
+- assess the predictive accuracy with the RMSE
 
-## SLIDE 1 {-}
+## Recap: geostatistical data {-}
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+- Geostatistical data: observations $Z(s_1), ..., Z(s_n)$ of a spatially continuous variable $Z$ collected at specific locations $s_1, ..., s_n$.
+- Geostatistical data ~ a partial realization of a random process $Z(\cdot)$
+- Examples:
+  - air pollution
+  - temperature levels taken at a set of monitoring stations
+- The aims are often to:
+  - infer the characteristics of the spatial process (mean, variability, ...)
+  - use this information to predict the process at unsampled locations
+
+## Recap: geostatistical data {-}
+
+- Previous chapter: Gaussian random fields with intrinsic stationarity
+  - spatial covariance & variogram are solely determined by distances
+  - simulating GRFs using the Matérn correlation function
+  - calculating the empirical variogram of a given GRF
+
+## Recap: geostatistical data {-}
+
+- Chapters 13-15: approaches for spatial interpolation:
+  - simple spatial interpolation methods (**this chapter**)
+  - kriging
+  - model-based geostatistics
+- Chapter 16: evaluate the predictive performance
+
+## Aim of spatial interpolation {-}
+
+To predict values of a spatially continuous variable\
+at **unsampled** locations $s_0$: $\hat{Z}(s_0)$
+
+## Considered methods {-}
+
+The methods in this chapter are simple and share a few properties:
+
+- _deterministic_ predictions (no uncertainty measures)
+- predictions $\hat{Z}(s_0)$ are based on:
+  - the _distance_ between an unsampled location $s_0$ and sampled locations $s_i$
+  - the $Z(s_i)$ _values_
+
+## Considered methods {-}
+
+- **closest observation method**
+  
+  $\hat{Z}(s_0) = Z(s_{closest})$
+
+## Considered methods {-}
+
+- **closest observation method**
+  
+  $\hat{Z}(s_0) = Z(s_{closest})$
+  
+- **inverse distance weighting method (IDW)**
+
+  $\hat{Z}(s_0) = \sum_{i = 1}^{n}(Z(s_i) \cdot w_i)$
+  
+  - with $w_i = d_i^{-\beta} / \sum_{i = 1}^{n}d_i^{-\beta}$
+  - optionally replace $n$ by $k < n$: use only the $k$ nearest locations
+
+## Considered methods {-}
+
+- **closest observation method**
+  
+  $\hat{Z}(s_0) = Z(s_{closest})$
+  
+- **inverse distance weighting method (IDW)**
+
+  $\hat{Z}(s_0) = \sum_{i = 1}^{n}(Z(s_i) \cdot w_i)$
+  
+  - with $w_i = d_i^{-\beta} / \sum_{i = 1}^{n}d_i^{-\beta}$
+  - optionally replace $n$ by $k < n$: use only the $k$ nearest locations
+
+- **nearest neighbours method**:
+  - special case of IDW with $\beta = 0$ and $k < n$ so that $w_i = 1 / k$
+
+## Packages and data {-}
+
+```{r message=FALSE, warning=FALSE}
+library(gstat)
+library(spData)
+library(sf)
+library(terra)
+library(ggplot2)
+library(tidyterra)
+```
+
+## Packages and data {-}
+
+`?depmunic`
+
+```{r}
+depmunic |> tibble::as_tibble() |> st_as_sf()
+st_crs(depmunic)$epsg
+```
+
+## Packages and data {-}
+
+```{r out.width="100%"}
+old <- theme_set(theme_bw())
+ggplot() + 
+  geom_sf(data = depmunic) + 
+  coord_sf(datum = "EPSG:2100")
+```
+
+## Packages and data {-}
+
+```{r}
+map <- st_union(depmunic) |> 
+  st_sf() |> 
+  nngeo::st_remove_holes()
+map
+```
+
+## Packages and data {-}
+
+```{r out.width="100%"}
+mapview::mapview(
+  map,
+  alpha.regions = 0.4,
+  lwd = 0,
+  map.types = "OpenStreetMap.Mapnik"
+)
+```
+
+## Packages and data  {-}
+
+`?properties`
+
+```{r}
+d <- properties |> tibble::as_tibble() |> st_as_sf()
+d$vble <- d$prpsqm
+d
+```
+
+
+## Packages and data {-}
+
+```{r out.width="100%"}
+ggplot() +
+  geom_sf(data = map, fill = "grey50") +
+  geom_sf(data = d, aes(colour = vble)) +
+  scale_colour_viridis_c(option = "magma", direction = -1) + 
+  coord_sf(datum = "EPSG:2100") +
+  theme_minimal()
+```
+
+## Prediction grid {-}
+
+```{r}
+grid <- rast(map, nrows = 100, ncols = 100, vals = 0) |> 
+  mask(map)
+grid
+```
+
+Aim: to get predicted values for each raster cell.
+
+## Prediction grid {-}
+
+```{r}
+make_athens_plot <- function(spatraster, title) {
+  ggplot() +
+    geom_spatraster(data = spatraster) +
+    geom_sf(data = map, fill = NA) +
+    coord_sf(datum = "EPSG:2100") +
+    scale_fill_viridis_c(
+      option = "magma",
+      direction = -1,
+      na.value = "transparent"
+    ) +
+    ggtitle(title)
+}
+```
+
+## Prediction grid {-}
+
+```{r out.width="100%"}
+grid |> 
+  make_athens_plot("Prediction grid")
+```
+
+## Closest observation method {-}
+
+$$\hat{Z}(s_0) = Z(s_{closest})$$
+
+```{r}
+vor <- vect(d) |> voronoi(bnd = map)
+vor
+```
+
+## Closest observation method {-}
+
+```{r  out.width="100%"}
+plot(vor)
+points(vect(d), cex = 0.3, col = "red")
+```
+
+## Closest observation method {-}
+
+```{r}
+r_closest <-
+  vect(d) |>
+  voronoi() |>
+  rasterize(grid, field = "vble") |>
+  mask(map)
+```
+
+## Closest observation method {-}
+
+```{r out.width="100%"}
+make_athens_plot(r_closest, "Closest observation")
+```
+
+## Approaches for IDW and nearest neighbours {-}
+
+To apply the closest neighbour method, we used `terra::voronoi()` and stayed with `{terra}`.
+
+## Approaches for IDW and nearest neighbours {-}
+
+To apply the closest neighbour method, we used `terra::voronoi()` and stayed with `{terra}`.
+
+For the IDW & nearest neighbour method, `gstat::gstat()` is used to define the interpolation algorithm.
+
+## Approaches for IDW and nearest neighbours {-}
+
+To apply the closest neighbour method, we used `terra::voronoi()` and stayed with `{terra}`.
+
+For the IDW & nearest neighbour method, `gstat::gstat()` is used to define the interpolation algorithm.
+
+However the book applies the `gstat` result to `sf` points, then converting back to a `SpatRaster`:
+
+- extract cell center coordinates from `grid`, create `sf` points object, then filter by `map`
+- then use the `predict()` method with the `gstat` and `sf` points objects
+  - advantage: `gstat::gstat()` is aware of `sf` geometries
+- then apply `terra::rasterize()` to the resulting points with predicted values
+
+## Approaches for IDW and nearest neighbours {-}
+
+Let's try to stay in `{terra}`!\
+It provides `terra::interpolate()` for a `SpatRaster` + `gstat` object.
+
+To achieve this, provide `d` as a _data frame_ to `gstat::gstat()` with _coordinate columns_.
+
+```{r}
+d2 <- data.frame(as.data.frame(d), crds(vect(d)))
+class(d2)
+```
+
+## Approaches for IDW and nearest neighbours {-}
+
+```{r}
+dplyr::glimpse(d2)
+```
+
+## Inverse Distance Weighting method (IDW) {-}
+
+$$\hat{Z}(s_0) = \sum_{i = 1}^{n}(Z(s_i) \cdot w_i)$$
+  
+$$w_i = d_i^{-\beta} / \sum_{i = 1}^{n}d_i^{-\beta}$$
+
+```{r}
+idw <- gstat(
+  formula = vble ~ 1, 
+  data = d2, 
+  locations = ~ x + y, 
+  set = list(idp = 1)
+)
+```
+
+## Inverse Distance Weighting method (IDW) {-}
+
+```{r results = "hide"}
+res <- grid |> interpolate(idw)
+```
+
+```{r}
+res
+```
+
+## Inverse Distance Weighting method (IDW) {-}
+
+```{r results = "hide"}
+r_idw <-
+  grid |>
+  interpolate(idw) |>
+  subset("var1.pred") |>
+  mask(map)
+```
+
+## Inverse Distance Weighting method (IDW) {-}
+
+```{r out.width="100%"}
+make_athens_plot(r_idw, "Inverse distance weighted")
+```
+
+## Nearest neighbours method {-}
+
+$$\hat{Z}(s_0) = \sum_{i = 1}^{k}(Z(s_i) \cdot w_i)$$
+
+$$w_i = d_i^{0} / \sum_{i = 1}^{k}d_i^{0} = 1 / k$$
+
+```{r}
+nn <- gstat(
+  formula = vble ~ 1, 
+  data = d2, 
+  locations = ~ x + y, 
+  nmax = 5, 
+  set = list(idp = 0)
+)
+```
+
+## Nearest neighbours method {-}
+
+```{r results="hide"}
+r_nn <-
+  grid |>
+  interpolate(nn) |>
+  subset("var1.pred") |>
+  mask(map)
+```
+
+## Nearest neighbours method {-}
+
+```{r out.width="100%"}
+make_athens_plot(r_nn, "Nearest neighbours")
+```
+
+## Ensemble approach {-}
+
+Combining interpolation method 1, 2, ..., j, ..., M:
+
+$$\hat{Z}(s_0) = \sum_{j = 1}^{M}(\hat{Z}_j(s_0) \cdot w_j)$$
+With $w_j$ the weight for each method; $\sum_{j = 1}^{M}w_j = 1$
+
+## Ensemble approach {-}
+
+The implementation just needs some simple raster algebra in `{terra}`.
+
+```{r}
+# using equal weights:
+r_ens <- mean(r_closest, r_idw, r_nn)
+```
+
+## Ensemble approach {-}
+
+```{r out.width="100%"}
+make_athens_plot(r_ens, "Ensemble prediction")
+```
+
+
+## Assessing performance with cross-validation {-}
+
+K-fold cross-validation:
+
+1. split the data in $K$ parts: use `dismo::kfold()` or just base R:
+
+```{r}
+k <- 5
+random_row_order <- sample(seq_len(nrow(d2)), nrow(d2))
+d2$k[random_row_order] <- rep(
+  seq_len(k),
+  each = ceiling(nrow(d2) / k)
+)
+head(d2$k, 20)
+```
+
+## Assessing performance with cross-validation {-}
+
+2. for each part in turn:
+    - use the remaining $K − 1$ parts as training data to define the interpolation
+    - use that part as testing data to predict
+    - compute the RMSE by comparing the testing and predicted data in each of the $K$ parts
+
+      $RMSE = \sqrt{\frac{\sum_{i = 1}^{n_{test}}(y_{i, test} - \hat{y}_{i, test})^2}{n_{test}}}$
+
+3. average the RMSE values obtained in each of the $K$ parts
+
 
 ## Meeting Videos {-}
 
