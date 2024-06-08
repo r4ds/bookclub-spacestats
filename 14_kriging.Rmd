@@ -66,9 +66,10 @@ library(sp)
 # Load the air quality data
 data(meuse)
 coordinates(meuse) <- c("x", "y")
-head(meuse)%>%
+meuse%>%
   as_data_frame()%>%
-  select(x,y,zinc)
+  select(x,y,zinc)%>$%
+  head()
 ```
 
 Step 2: Visualize the data.
