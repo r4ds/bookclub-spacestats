@@ -68,7 +68,7 @@ data(meuse)
 coordinates(meuse) <- c("x", "y")
 meuse%>%
   as_data_frame()%>%
-  select(x,y,zinc)%>$%
+  select(x,y,zinc)%>%
   head()
 ```
 
