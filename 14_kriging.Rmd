@@ -2,12 +2,222 @@
 
 **Learning objectives:**
 
-- THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
+- What is Kriging
+- How it can be used to interpolate spatial data
+- How to perform Kriging in R
 
-## SLIDE 1 {-}
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+
+
+## What is Kriging
+
+
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+library(tidyverse)
+theme_set(theme_minimal())
+```
+
+Kriging is a geostatistical interpolation technique that is used to estimate the value of a variable at an unobserved location based on the values of the variable at nearby locations. Kriging is based on the assumption that the spatial correlation between the values of the variable decreases with distance. Kriging is widely used in to interpolate spatial data when data are sparse or irregularly distributed.
+
+
+## Types of Kriging
+
+For example, Simple Kriging assumes the mean of the random field, μ(s), is known; 
+
+- **Simple Kriging**: Assumes that the mean of the variable is known and constant across the study area.
+
+Formula: $Z(s_0) = \mu + \sum_{i=1}^{n} \lambda_i (Z(s_i) - \mu)$
+
+where $\mu$ is the mean, $\lambda_i$ are the weights, and $Z(s_i)$ are the observed values.
+
+
+Ordinary Kriging assumes a constant unknown mean, μ(s)=μ; 
+
+- **Ordinary Kriging**: Assumes that the mean of the variable is unknown and varies across the study area.
+
+Formula: $Z(s_0) = \sum_{i=1}^{n} \lambda_i Z(s_i)$
+
+where $\lambda_i$ are the weights and $Z(s_i)$ are the observed values.
+
+Universal Kriging can be used for data with an unknown non-stationary mean structure.
+
+- **Universal Kriging**: Assumes that the mean of the variable is unknown and varies across the study area, but can be modeled as a function of covariates.
+
+Formula: $Z(s_0) = \sum_{i=1}^{n} \lambda_i Z(s_i) + \beta X(s_0)$
+
+where $\lambda_i$ are the weights, $Z(s_i)$ are the observed values, $\beta$ is the coefficient for the covariate $X(s_0)$, and $X(s_0)$ is the value of the covariate at the unobserved location.
+
+## Performing Kriging in R
+
+To perform Kriging in R, you can use the `gstat` package, which provides functions for geostatistical analysis. The `gstat` package allows you to create a variogram model, fit the model to the data, and use the model to interpolate values at unobserved locations.
+
+```{r}
+library(gstat)
+```
+
+### Example: Simple Kriging
+
+In this example, we will perform simple Kriging on a dataset of air quality measurements. We will estimate the air quality at unobserved locations based on the measurements at nearby monitoring stations.
+
+Step 1: Load the air quality data and create a variogram model.
+
+```{r warning=FALSE, message=FALSE}
+library(sp)
+# Load the air quality data
+data(meuse)
+coordinates(meuse) <- c("x", "y")
+head(meuse)%>%
+  as_data_frame()%>%
+  select(x,y,zinc)
+```
+
+Step 2: Visualize the data.
+```{r}
+meuse%>%
+  as_data_frame()%>%
+  select(x,y,zinc)%>%
+  ggplot(aes(x,y,color=zinc))+
+  geom_point()+
+  scale_color_viridis_c()
+```
+
+What we need is a grid of points where we want to predict the zinc concentration. 
+
+```{r}
+data(meuse.grid)
+meuse.grid %>%
+  as_data_frame()%>%
+  select(x,y)%>%
+  ggplot(aes(x,y))+
+  geom_point(shape=".")
+```
+
+```{r}
+zinc_data <- meuse%>%
+  as_data_frame()%>%
+  select(x,y,zinc)
+
+grid_data <- meuse.grid %>%
+  as_data_frame()%>%
+  select(x,y)
+
+ggplot()+
+  geom_point(data=grid_data,aes(x,y),shape=".")+
+  geom_point(data=zinc_data,aes(x,y,color=zinc))+
+  scale_color_viridis_c()
+```
+
+### Variogram Model
+
+We perform a Variogram analysis to understand the spatial correlation of the zinc concentration in the dataset.
+
+Formula: $V(h) = \frac{1}{2N(h)} \sum_{i=1}^{N(h)} (Z(s_i) - Z(s_i + h))^2$
+
+where $V(h)$ is the semivariance at lag distance $h$, $N(h)$ is the number of pairs of observations at lag distance $h$, $Z(s_i)$ is the value of the variable at location $s_i$, and $Z(s_i + h)$ is the value of the variable at location $s_i$ plus lag distance $h$.
+
+```{r}
+# Create a variogram model
+vc <- variogram(log(zinc) ~ 1, meuse, cloud = TRUE)
+plot(vc)
+v <- variogram(log(zinc) ~ 1, meuse)
+plot(v)
+```
+
+```{r}
+# Fit the variogram model
+fv <- fit.variogram(object = v, 
+                       model = vgm(psill = 0.5,
+                                   model = "Sph", 
+                                   range = 900,
+                                   nugget = 0.1))
+plot(v,fv)
+```
+
+### Perform Simple Kriging
+
+`gstat` function to compute the Kriging predictions:
+
+      `?gstat`
+      
+```{r}
+library(sf)
+
+data(meuse)
+data(meuse.grid)
+
+meuse <- st_as_sf(meuse, 
+                  coords = c("x", "y"), 
+                  crs = 28992)
+
+meuse.grid <- st_as_sf(meuse.grid, 
+                       coords = c("x", "y"),
+                       crs = 28992)
+```
+      
+```{r}
+v <- variogram(log(zinc) ~ 1, meuse)
+plot(v)
+```
+
+```{r}
+fv <- fit.variogram(object = v,
+                    model = vgm(psill = 0.5, 
+                                model = "Sph",
+                                range = 900, 
+                                nugget = 0.1))
+fv
+plot(v, fv, cex = 1.5)
+```
+
+      
+```{r}
+k <- gstat(formula = log(zinc) ~ 1, 
+           data = meuse, 
+           model = fv)
+kpred <- predict(k,meuse.grid)
+```
+
+```{r}
+ggplot() + 
+  geom_sf(data = kpred, 
+          aes(color = var1.pred)) +
+ # geom_sf(data = meuse) +
+  viridis::scale_color_viridis(name = "log(zinc)")
+
+ggplot() + 
+  geom_sf(data = kpred, 
+          aes(color = var1.var)) +
+  geom_sf(data = meuse) +
+  viridis::scale_color_viridis(name = "variance") 
+```
+
+
+```{r}
+# Perform simple Kriging
+kriged <- krige(log(zinc) ~ 1, meuse,
+                kpred,
+                model = fv)
+```
+
+### Plotting the Results
+
+```{r}
+# Plot the results
+plot(kriged)
+```
+
+## Summary
+
+- Kriging is a geostatistical interpolation technique used to estimate the value of a variable at unobserved locations.
+- There are different types of Kriging methods, including simple Kriging, ordinary Kriging, universal Kriging, and co-Kriging.
+- In R, you can perform Kriging using the `gstat` package, which provides functions for geostatistical analysis.
+
+## Additional Resources
+
+- [gstat package documentation](https://cran.r-project.org/web/packages/gstat/gstat.pdf)
+- [Geostatistics with R](https://www.r-bloggers.com/2016/02/geostatistics-with-r-tutorial/)
+- [Introduction to Geostatistics](https://www.youtube.com/watch?v=8v9v7JcOwJc)
+
 
 ## Meeting Videos {-}
 

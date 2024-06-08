@@ -19,12 +19,14 @@ Imports:
     nngeo,
     rmarkdown,
     sf,
+    sp,
     SpatialEpi,
     spData,
     spdep,
     terra,
     tibble,
     tidyterra,
-    tidyverse
+    tidyverse,
+    viridis
 Additional_repositories: https://inla.r-inla-download.org/R/stable
 Encoding: UTF-8
