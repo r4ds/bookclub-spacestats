@@ -2,12 +2,172 @@
 
 **Learning objectives:**
 
-- THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
+- understand that random effects of statistical models can be a Gaussian Random Field (GRF)
+- fit models with spatial correlation using R-INLA
 
-## SLIDE 1 {-}
+## Aim {-}
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+Fit a statistical model that:
+
+- can support various distribution families for the response variable
+- accommodates fixed and random effects
+- captures spatial correlation structure as a random effect
+- provides spatial predictions with uncertainty measures
+
+We will specify the spatial random effect as a Gaussian Random Field (GRF) with zero mean and a Matérn correlation.
+
+## INLA and GRFs {-}
+
+INLA can fit models containing a Gaussian Markov Random Field (GMRF).
+
+It does this by solving an SPDE (stochastic partial differential equation) on the vertices of a triangulated mesh.
+
+Generating the GMRF by solving the SPDE on the mesh can be controlled by:
+
+- setting the smoothness parameter of the spatial autocorrelation
+- requiring zero mean
+
+## INLA and GRFs {-}
+
+GRMF values fitted at vertices are then interpolated to locations of interest:
+
+- fitted values at observation locations
+- predicted values at prediction locations
+
+These interpolations need a **projection matrix**: defines the relation between locations and mesh vertices by means of weights.
+
+## Projection matrix {-}
+
+- The rows represent the locations of interest (observations, predictions).
+- The columns represent the mesh vertices.
+- The values are the barycentric coordinates of the locations of interest relative to the three vertices of the triangle, the latter having a mass of 1.
+- So the rowsums are 1.
+
+The values in the projection matrix are used as _weights_ to interpolate from triangle vertices to a location of interest.
+
+## Example in the book {-}
+
+Modelling fine particulate matter PM2.5 in the USA in relation to temperature and precipitation.
+
+$$Y_i \sim \mathcal{N}(\mu_i, \sigma^2)$$
+
+$$\mu_i = \beta_0 + \beta_1 \cdot T_i + \beta_2 \cdot P_i + S(x_i)$$
+
+## Preparations before fitting with `inla()` {-}
+
+- create the mesh
+- define the SPDE model
+- create an index set for the SPDE model
+- construct the projection matrix A
+- create a stack with the data for estimation and prediction
+
+## Preparations before fitting with `inla()` {-}
+
+- create the mesh
+
+```{r eval=FALSE}
+mesh <- inla.mesh.2d(loc = coo, max.edge = c(200, 500),
+                     cutoff = 1)
+```
+
+## Preparations before fitting with `inla()` {-}
+
+- define the SPDE model, after choosing the smoothness parameter $\nu$ (e.g. set $\nu = 1$, which means $\alpha = 2$ in a 2D plane)
+
+```{r eval=FALSE}
+spde <- inla.spde2.matern(mesh = mesh, alpha = 2, constr = TRUE)
+```
+
+- create an index set for the SPDE model
+
+```{r eval=FALSE}
+indexs <- inla.spde.make.index("s", spde$n.spde)
+> str(indexs)
+List of 3
+ $ s      : int [1:3747] 1 2 3 4 5 6 7 8 9 10 ...
+ $ s.group: int [1:3747] 1 1 1 1 1 1 1 1 1 1 ...
+ $ s.repl : int [1:3747] 1 1 1 1 1 1 1 1 1 1 ...
+```
+
+## Preparations before fitting with `inla()` {-}
+
+In the model formula, the SPDE model and the index set will be used in defining the random effect:
+
+`f(s, model = spde)`
+
+## Preparations before fitting with `inla()` {-}
+
+- construct the projection matrix A
+
+```{r eval=FALSE}
+A <- inla.spde.make.A(mesh = mesh, loc = coo)
+```
+
+## Preparations before fitting with `inla()` {-}
+
+- create a stack with the data for estimation and prediction
+
+```{r eval=FALSE}
+# stack for estimation stk.e
+stk.e <- inla.stack(
+  tag = "est",
+  data = list(y = d$value),
+  A = list(1, A),
+  effects = list(
+    data.frame(
+      b0 = rep(1, nrow(A)),
+      covtemp = d$covtemp,
+      covprec = d$covprec
+    ),
+    s = indexs
+  )
+)
+# stack for prediction stk.p
+stk.p <- inla.stack(
+  tag = "pred",
+  data = list(y = NA),
+  A = list(1, Ap),
+  effects = list(
+    data.frame(
+      b0 = rep(1, nrow(Ap)),
+      covtemp = dp$covtemp,
+      covprec = dp$covprec
+    ),
+    s = indexs
+  )
+)
+# stk.full has stk.e and stk.p
+stk.full <- inla.stack(stk.e, stk.p)
+```
+
+## Fit the model {-}
+
+```{r eval=FALSE}
+formula <- y ~ 0 + b0 + covtemp + covprec + f(s, model = spde)
+res <- inla(
+  formula,
+  family = "gaussian",
+  data = inla.stack.data(stk.full),
+  control.predictor = list(
+    compute = TRUE,
+    A = inla.stack.A(stk.full)
+  ),
+  control.compute = list(return.marginals.predictor = TRUE)
+)
+```
+
+
+## Extract results  {-}
+
+- `res$summary.fixed`
+- `res$summary.fitted.values`
+- `res$marginals.fitted.values`
+
+Extract needed subsets with: `inla.stack.index(stack = , tag =)`
+
+Compute the probability of exceeding a threshold (PM2.5 >= 10), by using `inla.pmarginal()`:
+
+`1 - inla.pmarginal(q = 10, marginal = marg)`
 
 ## Meeting Videos {-}
 

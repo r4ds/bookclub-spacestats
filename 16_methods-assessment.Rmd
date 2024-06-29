@@ -2,12 +2,28 @@
 
 **Learning objectives:**
 
-- THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
+- learn good practices in model evaluation
 
-## SLIDE 1 {-}
+## Overview {-}
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+Determining predictive performance of a spatial interpolation method requires:
+
+- a method to obtain training and testing datasets
+- a choice of the predictive performance measure (applied to each testing dataset)
+
+## Obtaining training and testing datasets {-}
+
+- K-fold or leave-one-out (LOOCV) cross validation (see chapter 13 for example code)
+- splitting is preferably done by random sampling (Wadoux et al., 2021)
+
+## Predictive performance measures {-}
+
+- _not_ taking into account uncertainty of predictions:
+  - MAE (mean absolute error)
+  - RMSE (root mean square error)
+- taking into account uncertainty of predictions:
+  - 95% CP (coverage probability): proportion of observations within the 95% prediction intervals
+  - CRPS (Continuous Ranked Probability Score): integration on the response scale of the squared difference between the predicted and the observed (degenarate) CDF.
 
 ## Meeting Videos {-}
 
