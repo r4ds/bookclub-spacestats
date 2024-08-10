@@ -2,12 +2,231 @@
 
 **Learning objectives:**
 
-- THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
+- understand the difference between spatial point _patterns_ vs. _processes_
+- learn about the properties of a Poisson process
+- simulate Poisson processes with constant or with spatially varying intensity
 
-## SLIDE 1 {-}
+## Spatial point process vs. spatial point pattern {-}
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+- **Spatial point process**: a _stochastic_ process $\{X_1, X_2, ..., X_{N(A)}\}$ taking values in a planar region $A \subset \mathbb{R}^2$.
+
+  !! $N(A)$ is a random variable !!
+
+- **Spatial point pattern**: a single _realization_ of a spatial point process.
+
+  Each realization has a different number of points and different locations.
+
+  The points are also often referred to as _events_.
+
+## Intensity function of a spatial point process {-}
+
+Intensity of a **spatial point pattern**: number of events per unit area.
+
+$$\lambda = \frac{N(A)}{|A|}$$
+
+For a **spatial point process**, $N(A)$ is a random variable, so its expected value is used to define the intensity parameter $\lambda$:
+
+$$\lambda = \frac{E[N(A)]}{|A|}$$
+
+## Intensity function of a spatial point process {-}
+
+Consider the planar region $A$ as a position range represented by a variable $x$.
+
+For a spatial point process we can define an intensity function that depends on $x$:
+
+$$\lambda(x) = \frac{E[N(x)]}{|x|}$$
+
+So $\lambda(x)$ now varies through space.
+
+## Intensity function of a spatial point process {-}
+
+We get the intensity for the study area by integration:
+
+$$\lambda = \frac{E[N(A)]}{|A|} = \frac{\int_A{\lambda(x) dx}}{|A|}$$
+
+## Commonly used special cases {-}
+
+- **stationary**, **isotropic** spatial point process: has a spatially constant intensity function in any subregion $A_i$ of $A$:
+
+$$\lambda(x) = \lambda = \frac{E[N(A)]}{|A|} = \frac{E[N(A_i)]}{|A_i|}$$
+
+## Commonly used special cases {-}
+
+- **Poisson** spatial point process:
+
+    in any subregion $A_i$ of $A$:
+
+1. the **number** of events follows a Poisson distribution:
+
+$$N(A_i) \sim \mathcal{Poisson}(\mu_{A_i})$$
+
+With:
+
+$$\mu_{A_i} = E[N(A_i)] = \int_{A_i}{\lambda(x) dx}$$
+
+## Commonly used special cases {-}
+
+2. the **locations** of realized events are obtained as a random sample, with the inclusion probability in $A_i$ proportional to the intensity function $\lambda(x)$.
+
+The general case, with spatially varying $\lambda(x)$, is called a **heterogeneous Poisson process**.
+
+With spatially constant $\lambda(x) = \lambda$, we have a **homogeneous Poisson process**.
+
+$$\mu_{A_i} = E[N(A_i)] = \int_{A_i}{\lambda(x) dx} = \lambda \cdot |A_i|$$
+
+This is also called **CSR = complete spatial randomness**, which is tied to homogeneous spatial point processes.
+
+## Poisson processes: what's next {-}
+
+We can:
+
+- simulate spatial point patterns from a homogeneous or heterogeneous Poisson process: **this chapter**
+- test whether a given spatial point pattern deviates from CSR: **next chapter**
+
+## Simulating spatial point patterns {-}
+
+Simulation is useful e.g. to generate a distribution of process properties and compare it with:
+
+- data (hypothesis testing for data)
+- or some preset requirement (power analysis with simulated samples).
+
+```{r message=FALSE}
+library(spatstat)
+```
+
+
+```{r include=FALSE}
+set.seed(20240808)
+```
+
+
+## Simulating spatial point patterns {-}
+
+Create a **single realization** of a Poisson process with intensity $\lambda(x)$ in a specific observation window with:
+
+```r
+rpoispp(lambda = , win = )
+```
+
+The argument `lambda` is:
+
+- a decimal number for _homogeneous_ Poisson processes
+- a function for _heterogeneous_ Poisson processes
+
+## Example: homogeneous {-}
+
+```{r}
+our_lambda <- 100
+our_window <- owin(xrange = c(0, 1), yrange = c(0, 2))
+```
+
+The size of the observation window is 2 square units, so the expected number of events is 2 * 100 = 200 events.
+
+```{r}
+simulated_hom <- rpoispp(lambda = our_lambda, win = our_window)
+simulated_hom
+```
+
+## Example: homogeneous {-}
+
+```{r out.width="100%"}
+plot(simulated_hom)
+```
+
+## Example: homogeneous {-}
+
+How many points are there?
+
+```{r}
+npoints(simulated_hom)
+```
+
+Note:
+
+```{r}
+npoints(simulated_hom) == our_lambda * 2
+```
+
+Each realization has its own number of events, since this number is sampled from the Poisson distribution!
+
+## Example: homogeneous {-}
+
+Compare further realizations with an intensity set at 100:
+
+```{r collapse=TRUE}
+rpoispp(lambda = our_lambda, win = our_window) |> npoints()
+rpoispp(lambda = our_lambda, win = our_window) |> npoints()
+rpoispp(lambda = our_lambda, win = our_window) |> npoints()
+rpoispp(lambda = our_lambda, win = our_window) |> npoints()
+```
+
+## Example: heterogeneous {-}
+
+```{r}
+our_lambda_fun <- function(x, y) {10 + 100 * x + 200 * y}
+our_window <- owin(xrange = c(0, 1), yrange = c(0, 2))
+```
+
+## Example: heterogeneous {-}
+
+What is the expected number of events in this observation window?
+
+$$E[N([0,1] \times [0,2])] = \int_{[0,1] \times [0,2]}{\lambda(x, y) dx dy} = 520$$
+
+## Example: heterogeneous {-}
+
+Let's first have a look at the spatial variation of the intensity!
+
+```{r message=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+## Example: heterogeneous {-}
+
+```{r intensity-gradient, eval=FALSE}
+crossing(
+  x = seq(0, 1, 0.02),
+  y = seq(0, 2, 0.02)
+) |>
+  mutate(intensity = our_lambda_fun(x, y)) |>
+  ggplot(aes(x = x, y = y, fill = intensity)) +
+  geom_tile() +
+  scale_fill_viridis_c() +
+  coord_fixed() +
+  theme_minimal() +
+  ggtitle("Chosen spatial\nintensity gradient")
+```
+
+
+## Example: heterogeneous {-}
+
+```{r ref.label="intensity-gradient", echo=FALSE, out.width="100%"}
+```
+
+## Example: heterogeneous {-}
+
+```{r}
+simulated_het <- rpoispp(lambda = our_lambda_fun, win = our_window)
+simulated_het
+```
+
+## Example: heterogeneous {-}
+
+```{r out.width="100%"}
+plot(simulated_het)
+```
+
+## Example: heterogeneous {-}
+
+```{r collapse=TRUE}
+rpoispp(lambda = our_lambda_fun, win = our_window) |> npoints()
+rpoispp(lambda = our_lambda_fun, win = our_window) |> npoints()
+rpoispp(lambda = our_lambda_fun, win = our_window) |> npoints()
+rpoispp(lambda = our_lambda_fun, win = our_window) |> npoints()
+```
+
 
 ## Meeting Videos {-}
 

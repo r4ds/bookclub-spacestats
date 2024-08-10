@@ -21,10 +21,12 @@ Imports:
     sf,
     sp,
     SpatialEpi,
+    spatstat,
     spData,
     spdep,
     terra,
     tibble,
+    tidyr,
     tidyterra,
     tidyverse,
     viridis
