@@ -1,13 +1,112 @@
 # Complete spatial randomness
 
-**Learning objectives:**
+**Learning objective:**
 
-- THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
+- learn how to test whether a given spatial point pattern deviates from CSR
 
-## SLIDE 1 {-}
+## Complete spatial randomness {-}
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+CSR is represented by the homogeneous Poisson process (chapter 19).
+
+It is defined as a Poisson process with spatially constant $\lambda(x) = \lambda$.
+
+## Randomness of a given spatial point pattern {-}
+
+Most processes, hence their patterns, deviate from CSR to some degree.
+
+For a given point pattern we can:
+
+- describe the deviation from CSR using a test statistic;
+- then compare the test statistic with its null distribution, i.e. under CSR, to perform a statistical hypothesis test.
+
+## Test statistic {-}
+
+The test statistic relies on _dividing_ the observation window into $m$ subregions.
+
+For each subregion $i$ we compare:
+
+- the observed number of events $n_{i,obs}$
+- the -- under CSR -- expected number of events $n_{i,exp}$.\
+For subregions of equal size, this is: $n_{i,exp} = n / m$
+
+## Test statistic {-}
+
+The test statistic is defined as:
+
+$$X^2 = \sum_{i = 1}^{m}\frac{(n_{i,obs} - n_{i,exp})^2}{n_{i,exp}}$$
+
+It follows a Chi-square distribution under the null hypothesis, i.e. _under CSR_.
+
+$$X_{CSR}^2 \sim \chi_{m-1}^2$$
+
+## Possible outcomes {-}
+
+The test statistic can be:
+
+- significantly less than expected (one-sided left testing): a **regular** point pattern.
+    - i.e. points are more spaced than in a random pattern
+- significantly greater than expected (one-sided right testing): a **clustered** point pattern.
+    - i.e. points are more aggregated than in a random pattern
+- significantly different than expected (two-sided testing): a **non-random** point pattern.
+- _not_ significantly different than expected (one- or two-sided testing): the point pattern has not been shown to deviate from a **random** point pattern in one or both directions.
+
+## spatstat functions {-}
+
+- `quadratcount(<ppp>, nx = , ny = )` to define subregions (`nx` columns, `ny` rows) and count events per subregion
+- `quadrat.test(<quadratcount>)` for CSR hypothesis testing. Extra arguments:
+    - `alternative = `: possible are `"two-sided"` (default), `"clustered"` and `"regular"`
+    - `method = `: defaults to `"Chisq"`; `"MonteCarlo"` is also possible (CSR distribution by simulations)
+
+## Example: longleaf {-}
+
+We don't want the marks (tree diameter) in plots, so let's drop those.
+
+```{r message=FALSE}
+library(spatstat)
+(longleaf2 <- unmark(longleaf))
+```
+
+## Example: longleaf {-}
+
+```{r out.width="100%"}
+plot(longleaf2)
+axis(1)
+axis(2)
+```
+
+## Example: longleaf {-}
+
+```{r}
+qc <- quadratcount(longleaf2, nx = 6, ny = 6)
+qc
+```
+
+`nx` and `ny` default to 5
+
+## Example: longleaf {-}
+
+```{r out.width="100%"}
+plot(longleaf2, cols = "grey60")
+plot(qc, add = TRUE, cex = 1.2)
+```
+
+## Example: longleaf {-}
+
+```{r}
+quadrat.test(qc)
+```
+
+## Example: longleaf {-}
+
+```{r}
+quadrat.test(qc, alternative = "clustered")
+```
+
+## Example: longleaf {-}
+
+```{r}
+quadrat.test(qc, alternative = "regular")
+```
 
 ## Meeting Videos {-}
 
