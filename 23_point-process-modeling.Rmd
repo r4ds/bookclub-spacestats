@@ -1,13 +1,438 @@
 # Point process modeling
 
+```{r include=FALSE}
+oldopt <- options(pillar.print_max = 5, pillar.print_min = 5)
+```
+
 **Learning objectives:**
 
-- THESE ARE NICE TO HAVE BUT NOT ABSOLUTELY NECESSARY
+- understand that spatial point process intensity can be modelled with a Gaussian Random Field (GRF)
+- use R-INLA with spatial correlation to model intensity
 
-## SLIDE 1 {-}
+## Considering intensity as a stochastic variable {-}
 
-- ADD SLIDES AS SECTIONS (`##`).
-- TRY TO KEEP THEM RELATIVELY SLIDE-LIKE; THESE ARE NOTES, NOT THE BOOK ITSELF.
+Up to now, we have considered intensity as a fixed parameter of either:
+
+- the whole study region $A$ (homogeneous poisson process):
+
+$$\lambda = \frac{E[N(A)]}{|A|}$$
+
+- the location $x$ (inhomogeneous poisson process):
+
+$$\lambda(x) = \lim\limits_{|dx| \to 0}\frac{E[N(dx)]}{|dx|}$$
+
+## Considering intensity as a stochastic variable {-}
+
+However we can approach intensity as a (locally) stochastic variable with a Poisson distribution:
+
+$$\Lambda(s) \sim \mathcal{Poisson}(\mu_s)$$
+
+To fit this model, we use the number of events in subregions $A_i$ of $A$ and use the area of $A_i$ as an offset:
+
+$$|A_i| \cdot \Lambda(s)_{A_i} \sim \mathcal{Poisson}(|A_i| \cdot \mu_s)$$
+
+## Considering intensity as a stochastic variable {-}
+
+$\mu_s$ is fit using a log link and a linear predictor $\eta_s$:
+
+$log(\mu_s) = \eta_s =$ fixed effects + spatial random effect (GRF) + unstructured random effect
+
+A model (process) where a response variable can be expressed as a Gaussian process using a log link, is called a **Log-Gaussian Cox Process**.
+
+## Considering intensity as a stochastic variable {-}
+
+The GRF can be fitted using either a regular grid or a triangulated mesh.
+
+- The book elaborates the latter, using INLA!
+- The triangulated mesh approach doesn't rely on binning, but respects the exact location of events.
+
+## Similarities with chapter 15 (model-based geostatistics) {-}
+
+- Use of R-INLA
+- Fitting models with a Gaussian Markov Random Field (GMRF) as a spatially correlated random effect
+
+## Differences with chapter 15 (model-based geostatistics) {-}
+
+- In geostatistical data, the stochastic process $Z(s)$ (a continuous response variable) can be observed everywhere in domain $D$.
+- But in a spatial point process, domain $D$ is defined as where the events occur; so the domain itself is considered stochastic.
+  - Point patterns arise when the variable to be analyzed corresponds to the _location of events_.
+
+## Aim in chapter 15 (model-based geostatistics) {-}
+
+Fit a statistical model that:
+
+- can support various distribution families for the _response variable_
+- accommodates fixed and random effects
+- captures spatial correlation structure as a random effect
+- provides spatial predictions with uncertainty measures
+
+Specify the spatial random effect as a Gaussian Random Field (GRF) with zero mean and a Matérn correlation.
+
+## How to model a spatial point process with INLA? {-}
+
+- Model the **intensity** of the spatial point process over the whole study region.
+So consider the intensity as the response variable.
+- The linear predictor for the intensity is modelled as a local intercept plus a **GMRF with zero mean and a Matérn correlation** (spatial random effect).
+- To do that, an **SPDE** (stochastic partial differential equation) is fitted on the vertices of a triangulated mesh.
+
+## How to model a spatial point process with INLA? {-}
+
+- We fit the intensity by modelling the number of points _per unit area_ as a **Poisson distribution**.
+- The **area offset** for the mesh vertices (integration points) is determined by a **dual mesh**: polygons around the primary mesh vertices.
+In effect, the offset serves as a weight.
+  - The response at the mesh vertices is set to an initial observation of 0 points and offset according to the dual mesh.
+  - The response at the event locations is set as 1 with an offset of 0.
+
+## Projection matrix for spatial point processes {-}
+
+As in chapter 15: 
+
+GMRF values fitted at vertices are then interpolated to locations of interest:
+
+- fitted values at observation locations
+- predicted values at prediction locations
+
+These interpolations need a **projection matrix**: defines the relation between locations and mesh vertices by means of weights.
+
+## Projection matrix for spatial point processes {-}
+
+As in chapter 15: 
+
+- the rows represent the locations of interest (either observations or predictions).
+- the columns represent the mesh vertices.
+- the values are the barycentric coordinates of the locations of interest relative to the three vertices of the triangle, the latter having a mass of 1.
+- So the rowsums are 1.
+
+## Projection matrix for spatial point processes {-}
+
+The values in the projection matrix are used as _weights_ to interpolate from observations to triangle vertices, or from triangle vertices to a prediction location.
+
+For a spatial point process this is not different.
+A projection matrix is created for:
+
+- the **observation locations**: both the mesh vertices and the event locations (see before)
+- the **prediction locations**
+
+## Example in the book {-}
+
+```{r message=FALSE}
+library(sf)
+library(terra)
+library(tidyterra)
+library(dplyr)
+library(rnaturalearth)
+library(ggplot2)
+library(INLA)
+```
+
+```{r}
+projUTM <- "+proj=utm +zone=19 +south +ellps=GRS80 \
+            +towgs84=0,0,0,0,0,0,0 +units=km +no_defs"
+```
+
+
+## Example in the book {-}
+
+Modelling the occurrence of the plant genus _Solanum_ in Bolivia between 2015 and 2022 (data from [GBIF](https://gbif.org)).
+
+Using only a spatial GRF and a local intercept.
+
+```{r}
+d <- readr::read_csv("data/solanum.csv", col_types = "cddcDc") |> 
+  select(longitude, latitude) |> 
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |> 
+  st_transform(projUTM)
+map_4326 <- ne_countries(
+  type = "countries",
+  country = "Bolivia",
+  scale = "medium",
+  returnclass = "sf"
+)
+map <- map_4326 |> st_transform(projUTM)
+```
+
+## Example in the book {-}
+
+```{r}
+# modern way to do this conversion (but currently looses the CRS attribute):
+map_4326 |> 
+  st_geometry() |> 
+  st_transform("EPSG:5356") |> 
+  st_transform(pipeline = "+proj=unitconvert +xy_out=km")
+```
+
+## Example in the book {-}
+
+Observed occurrences (spatial point pattern):
+
+```{r}
+d
+coo <- st_coordinates(d)
+(n <- nrow(coo))
+```
+
+## Example in the book {-}
+
+```{r out.width="100%"}
+ggplot() + 
+  geom_sf(data = map, fill = "grey30") +
+  geom_sf(data = d, colour = "pink", shape = 21) + 
+  coord_sf(datum = projUTM) +
+  theme_linedraw()
+```
+
+## Preparations before fitting with `inla()` {-}
+
+Similar to chapter 15: 
+
+- create the **mesh** and the **dual mesh**
+- calculate the **offsets** (surface areas) to fit intensities instead of numbers
+- define the **SPDE** model
+- construct the **projection matrix `A.obs`** for observation locations
+- construct the **projection matrix `A.p`** for prediction locations
+- create a **stack** with the data for estimation and prediction
+
+## Create the mesh {-}
+
+```{r}
+mesh <- inla.mesh.2d(
+  loc.domain = st_coordinates(map)[, c("X", "Y")],
+  max.edge = c(50, 100),
+  offset = c(50, 100),
+  cutoff = 1
+)
+(nmesh <- mesh$n)
+```
+
+## Create the mesh {-}
+
+```{r out.width="100%", echo=FALSE}
+plot(mesh, edge.color = "grey70", draw.segments = FALSE)
+points(coo, pch = 20, cex = 0.25, col = "purple")
+lines(st_coordinates(map)[, "X"], st_coordinates(map)[, "Y"])
+```
+
+## Create the dual mesh {-}
+
+```{r}
+source("R/book.mesh.dual_function.R")
+dmesh <- book.mesh.dual(mesh)
+```
+
+## Create the dual mesh {-}
+
+```{r out.width="100%", echo=FALSE}
+plot(dmesh, border = "lightblue")
+plot(mesh, add =  TRUE, edge.color = "grey70", draw.segments = FALSE)
+```
+
+## Calculate the offsets (surface areas) {-}
+
+This is needed to fit intensities instead of numbers.
+The surface areas serve as weights for the mesh vertices.
+
+```{r}
+dmesh_sf <- st_as_sf(dmesh)
+st_crs(dmesh_sf) <- st_crs(map)
+dmesh_sf <- dmesh_sf |> 
+  mutate(id = row_number()) |> 
+  st_sf(agr = "identity")
+
+w <- st_intersection(dmesh_sf, st_geometry(map)) |>
+  (\(x) mutate(x, area = st_area(x) |> as.numeric()))() |>
+  st_drop_geometry() |>
+  left_join(x = dmesh_sf, y = _, join_by(id)) |>
+  mutate(area = ifelse(is.na(area), 0, area)) |>
+  pull(area)
+```
+
+## Calculate the offsets (surface areas) {-}
+
+`w` contains surface areas in km² within Bolivia:
+
+```{r}
+summary(w)
+sum(w)
+st_area(map)
+```
+
+## Define the SPDE model {-}
+
+The smoothness parameter was chosen as $\nu = 1$, which means $\alpha = 2$ in a 2D plane.
+
+```{r}
+spde <- inla.spde2.matern(mesh = mesh, alpha = 2, constr = TRUE)
+```
+
+## Define the SPDE model {-}
+
+In the model formula, the SPDE model will be used in defining the random effect:
+
+`f(s, model = spde)`
+
+## Construct the projection matrices {-}
+
+Projection matrix for observation locations:
+
+```{r}
+# event locations
+A.y <- inla.spde.make.A(mesh = mesh, loc = coo)
+# mesh vertices
+A.mesh <- Diagonal(nmesh, rep(1, nmesh))
+# all observations
+A.obs <- rbind(A.mesh, A.y)
+dim(A.obs)
+nmesh
+nmesh + n
+```
+
+## Construct the projection matrices {-}
+
+Construct prediction locations:
+
+```{r}
+grid <- rast(map, nrows = 100, ncols = 100)
+# transform grid to a sf points object
+dp <- grid |> 
+  crds() |> 
+  as.data.frame() |> 
+  st_as_sf(coords = c("x", "y"), crs = st_crs(map))
+# indices points within the map
+indicespointswithin <- which(st_intersects(dp, map, sparse = FALSE))
+# points within the map
+dp <- st_filter(dp, map)
+coop <- st_coordinates(dp)
+```
+
+## Construct the projection matrices {-}
+
+```{r out.width="100%"}
+ggplot() + 
+  geom_sf(data = map, fill = "grey30") +
+  geom_sf(data = dp, colour = "lightblue", size = 0.2) + 
+  coord_sf(datum = projUTM) +
+  theme_linedraw()
+```
+
+## Preparations before fitting with `inla()` {-}
+
+Projection matrix for the prediction locations:
+
+```{r}
+A.p <- inla.spde.make.A(mesh = mesh, loc = coop)
+```
+
+## Stack with data for estimation and prediction {-}
+
+Defining the observations & their offset:
+
+```{r}
+y.obs <- rep(0:1, c(nmesh, n))
+e.obs <- c(w, rep(0, n)) # areas!!
+```
+
+Stack for estimation:
+
+```{r}
+stk.e <- inla.stack(
+  tag = "est",
+  data = list(y = y.obs, e = e.obs),
+  A = list(1, A.obs),
+  effects = list(
+    list(b0 = rep(1, nmesh + n)),
+    list(s = 1:nmesh)
+  )
+)
+```
+
+## Stack with data for estimation and prediction {-}
+
+Stack for prediction:
+
+```{r}
+stk.p <- inla.stack(
+  tag = "pred",
+  data = list(y = rep(NA, nrow(coop)), e = rep(0, nrow(coop))),
+  A = list(1, A.p),
+  effects = list(
+    data.frame(b0 = rep(1, nrow(coop))),
+    list(s = 1:nmesh)
+  )
+)
+```
+
+Combine both stacks:
+
+```{r}
+stk.full <- inla.stack(stk.e, stk.p)
+```
+
+## Fit the model {-}
+
+```{r}
+formula <- y ~ 0 + b0 + f(s, model = spde)
+```
+
+```{r warning=FALSE, message=FALSE}
+res <- inla(
+  formula,
+  family = 'poisson',
+  data = inla.stack.data(stk.full),
+  control.predictor = list(
+    compute = TRUE,
+    link = 1,
+    A = inla.stack.A(stk.full)
+  ),
+  E = inla.stack.data(stk.full)$e
+)
+```
+
+E is the offset: _the known component in the mean for the Poisson likelihoods, defined as $E_i \cdot e^{\eta_i}$_.
+
+## Extract results  {-}
+
+Extract needed subsets with: `inla.stack.index(stack = , tag =)`
+
+```{r}
+index <- inla.stack.index(stk.full, tag = "pred")$data
+pred_mean <- res$summary.fitted.values[index, "mean"]
+pred_ll <- res$summary.fitted.values[index, "0.025quant"]
+pred_ul <- res$summary.fitted.values[index, "0.975quant"]
+
+grid$ll <- NA
+grid$mean <- NA
+grid$ul <- NA
+
+grid$mean[indicespointswithin] <- pred_mean
+grid$ll[indicespointswithin] <- pred_ll
+grid$ul[indicespointswithin] <- pred_ul
+```
+
+## Extract results  {-}
+
+```{r}
+grid
+```
+
+## Extract results  {-}
+
+```{r prediction-plot, eval=FALSE}
+ggplot() +
+  geom_spatraster(data = grid) +
+  coord_sf(datum = st_crs(grid)) +
+  facet_wrap(~lyr) +
+  scale_fill_viridis_c(na.value = "transparent", direction = -1) +
+  theme_minimal()
+```
+
+## Extract results  {-}
+
+```{r ref.label="prediction-plot", echo=FALSE, out.width="100%"}
+```
+
+```{r include=FALSE}
+options(oldopt)
+```
 
 ## Meeting Videos {-}
 
