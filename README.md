@@ -11,7 +11,7 @@ As we read, we are producing [notes about the book](https://dslc.io/spacestats).
 
 If you would like to present, please see the sign-up sheet for your cohort (linked below, and pinned in the [#book_club-spacestats](https://dslcio.slack.com/archives/C066RJ24SHF) channel on Slack)!
 
-- [Cohort 1](https://docs.google.com/spreadsheets/d/1cD_aXJJ73O1cL3EI79-e_Y9eWNNqvftv8das1hcBGRA/edit?usp=sharing) (started 2024-01-20, facilitated by Mikhael Manurung): [Saturdays, 10:00 AM CST/CDT](https://www.timeanddate.com/worldclock/converter.html?iso=20240120T160000&p1=24&p2=1440) | [meeting videos](https://www.youtube.com/playlist?list=PL3x6DOfs2NGhACUSnWhcsTLMbDikFQ8fL)
+- Cohort 1 (started 2024-01-20, ended 2024-09-14): [meeting videos](https://www.youtube.com/playlist?list=PL3x6DOfs2NGhACUSnWhcsTLMbDikFQ8fL)
 
 <hr>
 
